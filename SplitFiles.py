@@ -21,7 +21,10 @@ def save_upload(uploaded_file):
         f.write(uploaded_file.read())
     return tmp_path
 
-
+def reset_columns():
+   if "df_col" in st.session_state:
+     st.session_state.df_col = None
+    
 def identifier():
     return ''.join(random.choices(string.ascii_lowercase, k=4))
 
@@ -87,7 +90,7 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
 
 st.header("Split Files")
 
-fileLoc = st.file_uploader("Upload File", type=["csv", "xlsx"])
+fileLoc = st.file_uploader("Upload File", type=["csv", "xlsx"], on_change=reset_columns)
 
 if "df_col" not in st.session_state:
     st.session_state.df_col = None
@@ -99,21 +102,26 @@ if fileLoc:
 
     cleanPattern = re.compile(r"\s")
     
-    if st.session_state.df_col is None:
-        if fileextn == "xlsx":
+    if fileextn == "xlsx":
             with pd.ExcelFile(filePath, engine="openpyxl") as file:
                 sheets = file.sheet_names
                 
+            selected_sheet = sheets[0]
             if len(sheets) > 1:
-                select_sheets = st.selectbox(label = "Multiple Sheets detected. Select a sheet to process", options=sheets)
-                if select_sheets:
-                    df = pd.read_excel(filePath,nrows=100 , sheet_name=select_sheets)
-            else:
-                df = pd.read_excel(filePath,nrows=100 , sheet_name=sheets[0])
-        else:
-            df= pd.read_csv(filePath,sep=",", nrows = 100, encoding_errors="replace")
+                selected_sheet = st.selectbox(
+                    "Multiple sheets detected. Select a sheet to process",
+                    options=sheets,
+                    on_change=reset_columns,
+                )
 
-        st.session_state.df_col = df.columns
+            if selected_sheet and st.session_state.df_col is None:
+                df = pd.read_excel(filePath, sheet_name=selected_sheet, nrows=100)
+                st.session_state.df_col = df.columns
+    else:
+            if st.session_state.df_col is None:
+                df= pd.read_csv(filePath,sep=",", nrows = 100, encoding_errors="replace")
+
+                st.session_state.df_col = df.columns
 
     chkbox = st.checkbox(label="Check to manually define 'mail to be sent' info")
 
