@@ -21,10 +21,7 @@ def save_upload(uploaded_file):
         f.write(uploaded_file.read())
     return tmp_path
 
-def reset_columns():
-   if "df_col" in st.session_state:
-     st.session_state.df_col = None
-    
+
 def identifier():
     return ''.join(random.choices(string.ascii_lowercase, k=4))
 
@@ -35,9 +32,15 @@ def exportFile(part_df, partName, CHUNK_SIZE):
     export_date = datetime.now().date().strftime("%d%m")
     for part_idx, start in enumerate(range(0, len(part_df), CHUNK_SIZE)):
         chunk = part_df.iloc[start:start + CHUNK_SIZE].copy()
-        mail_tag = f"{partName}{export_date}{part_idx + 1}".lower()
+        
 
-        chunk["mail to be sent"] = mail_tag
+        if partName is not None:
+            mail_tag = f"{partName}{export_date}{part_idx + 1}".lower()
+            chunk["mail to be sent"] = mail_tag
+            
+        else:
+            mail_tag = f"file{export_date}{part_idx + 1}".lower()
+
         outputFileName = f"{mail_tag}.csv"
         chunk.to_csv(rf"{outputFileName}", index=False, sep=",")
 
@@ -45,6 +48,16 @@ def exportFile(part_df, partName, CHUNK_SIZE):
 
     return files 
 
+def reset_columns():
+    if "df_col" in st.session_state:
+        st.session_state.df_col = None
+
+def update_colums():
+    if "df_col" in st.session_state:
+        st.session_state.df_col = None
+
+    if "sheet_num" in st.session_state:
+        st.session_state.sheet_num = None
 
 def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, manual = False):
     if fileextn == "xlsx":
@@ -58,7 +71,7 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
     ziptemp.close()
 
     with zipfile.ZipFile(ziptemp.name, "w", zipfile.ZIP_DEFLATED) as zf:
-        if manual == False :
+        if manual == False:
             Values = df[select_columns].value_counts().to_frame("index").reset_index(drop=False)
             Values["Parts"] = Values["index"].map(lambda x: ceil(x/CHUNK_SIZE))
 
@@ -78,6 +91,7 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
                 for file in files:
                     zf.write(file, arcname=file)
                     os.unlink(file)
+
         else:
             Values = df.iloc[1:, :][export_columns].reset_index(drop=True)
             files = exportFile(Values, select_columns, CHUNK_SIZE)
@@ -85,16 +99,20 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
             for file in files:
                 zf.write(file, arcname=file)
                 os.unlink(file)
+        
 
     return ziptemp.name
 
 st.header("Split Files")
 
-fileLoc = st.file_uploader("Upload File", type=["csv", "xlsx"], on_change=reset_columns)
+fileLoc = st.file_uploader("Upload File", type=["csv", "xlsx"], on_change=update_colums)
 
 if "df_col" not in st.session_state:
     st.session_state.df_col = None
 
+if "sheet_num" not in st.session_state:
+    st.session_state.sheet_num = None
+    
 if fileLoc:
     filePath = save_upload(fileLoc)
     fileName,  fileextn = os.path.basename(filePath).split(".")
@@ -103,23 +121,23 @@ if fileLoc:
     cleanPattern = re.compile(r"\s")
     
     if fileextn == "xlsx":
-            with pd.ExcelFile(filePath, engine="openpyxl") as file:
-                sheets = file.sheet_names
+            if st.session_state.sheet_num is None:
+                with pd.ExcelFile(filePath, engine="openpyxl") as file:
+                    st.session_state.sheet_num = file.sheet_names
                 
-            selected_sheet = sheets[0]
-            if len(sheets) > 1:
-                selected_sheet = st.selectbox(
-                    "Multiple sheets detected. Select a sheet to process",
-                    options=sheets,
-                    on_change=reset_columns,
-                )
-
-            if selected_sheet and st.session_state.df_col is None:
-                df = pd.read_excel(filePath, sheet_name=selected_sheet, nrows=100)
-                st.session_state.df_col = df.columns
+            if len(st.session_state.sheet_num) > 1:
+                select_sheets = st.selectbox(label = "Multiple Sheets detected. Select a sheet to process", options=st.session_state.sheet_num, on_change=reset_columns)
+                if select_sheets and st.session_state.df_col is None:
+                    df = pd.read_excel(filePath,nrows=10 , sheet_name=select_sheets)
+                    st.session_state.df_col = df.columns
+            else:
+                if st.session_state.df_col is None:
+                    df = pd.read_excel(filePath,nrows=10 , sheet_name=st.session_state.sheet_num[0])
+            
+                    st.session_state.df_col = df.columns
     else:
             if st.session_state.df_col is None:
-                df= pd.read_csv(filePath,sep=",", nrows = 100, encoding_errors="replace")
+                df= pd.read_csv(filePath,sep=",", nrows = 10, encoding_errors="replace")
 
                 st.session_state.df_col = df.columns
 
@@ -127,29 +145,29 @@ if fileLoc:
 
     manual = False
     if chkbox:
-        select_columns = st.text_input("Enter a custom identifier for the file name", max_chars=20)
+        select_columns = st.text_input("Enter a custom identifier for the file name", max_chars=20, placeholder="Leave the field empty if 'mail to be sent' is not required")
         manual = True
     else:
         select_columns = st.selectbox(label = "Select a column to process for 'mail to be sent'", options=st.session_state.df_col, index=None)
  
 
-    if select_columns:
-        export_columns = st.multiselect(label = "Select columns to export.", options=st.session_state.df_col)
+     
+    export_columns = st.multiselect(label = "Select columns to export.", options=st.session_state.df_col)
+    
+    if export_columns:
+        btn = st.button(label="Generate Data", type="primary")
         
-        if export_columns:
-            btn = st.button(label="Generate Data", type="primary")
-            
-            if btn:
-                if len(cleanPattern.sub("", select_columns)) > 0:
-                    with st.spinner("Processing..",show_time=True):
-                        zipFileName = splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, manual)
+        if btn:
+            with st.spinner("Processing..",show_time=True):
+                if len(cleanPattern.sub("", select_columns)) == 0:
+                    select_columns = None
+                zipFileName = splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, manual)
 
-                        outputFileName = f"{fileName}_frmt.zip"
-                        with open(zipFileName, "rb") as f:
-                                    st.download_button("Download Files", f,  file_name=outputFileName)
+                outputFileName = f"{fileName}_frmt.zip"
+                with open(zipFileName, "rb") as f:
+                            st.download_button("Download Files", f,  file_name=outputFileName)
 
-                        os.unlink(zipFileName) 
-                else:
-                    raiseError("Custom identifier cannot be blank or whitespace.")
+                os.unlink(zipFileName) 
+                
 
     
