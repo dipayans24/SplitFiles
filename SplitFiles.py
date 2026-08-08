@@ -7,8 +7,7 @@ import streamlit as st
 import pandas as pd, re
 from datetime import date, datetime
 from math import ceil
-from stqdm import stqdm
- 
+
 
 @st.dialog("Error!!")
 def raiseError(text):
@@ -78,7 +77,7 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
             Values["Parts"] = Values["index"].map(lambda x: ceil(x/CHUNK_SIZE))
 
         
-            for funnel, _ in stqdm(Values[[select_columns, "Parts"]].itertuples(index=False)):
+            for funnel, _ in Values[[select_columns, "Parts"]].itertuples(index=False):
                 funnel = str(funnel)
                 if select_columns != "index":
                     part_df = (df.loc[df[select_columns] == funnel, export_columns].reset_index(drop=True))
