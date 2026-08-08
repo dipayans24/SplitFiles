@@ -8,6 +8,24 @@ import pandas as pd, re
 from datetime import date, datetime
 from math import ceil
 
+st.markdown("""
+    <style>
+    div.stDownloadButton > button {
+        background-color: #28a745;
+        color: white;
+        border: 1px solid #28a745;
+    }
+    div.stDownloadButton > button:hover {
+        background-color: #218838;
+        border: 1px solid #218838;
+        color: white;
+    }
+    div.stDownloadButton > button:active {
+        background-color: #1e7e34;
+        color: white;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 @st.dialog("Error!!")
 def raiseError(text):
