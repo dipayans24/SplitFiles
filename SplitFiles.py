@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd, re
 from datetime import date, datetime
 from math import ceil
+from stqdm import stqdm
  
 
 @st.dialog("Error!!")
@@ -65,6 +66,7 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
     else:
         df= pd.read_csv(filePath,sep=",", encoding_errors="ignore", low_memory=False)
 
+    st.write("File read complete.")
     PATTERN = re.compile(r"\W+")
     
     ziptemp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
@@ -76,7 +78,7 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
             Values["Parts"] = Values["index"].map(lambda x: ceil(x/CHUNK_SIZE))
 
         
-            for funnel, _ in Values[[select_columns, "Parts"]].itertuples(index=False):
+            for funnel, _ in stqdm(Values[[select_columns, "Parts"]].itertuples(index=False)):
                 funnel = str(funnel)
                 if select_columns != "index":
                     part_df = (df.loc[df[select_columns] == funnel, export_columns].reset_index(drop=True))
@@ -88,17 +90,18 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
                 partName = f"{clean_funnel}"
                 files = exportFile(part_df.iloc[1:, :], partName, CHUNK_SIZE)
 
-                for file in files:
-                    zf.write(file, arcname=file)
-                    os.unlink(file)
+                #for file in files:
+                #    zf.write(file, arcname=file)
+                #    os.unlink(file)
 
         else:
             Values = df.iloc[1:, :][export_columns].reset_index(drop=True)
             files = exportFile(Values, select_columns, CHUNK_SIZE)
 
-            for file in files:
-                zf.write(file, arcname=file)
-                os.unlink(file)
+        st.write("Packing in zip...")
+        for file in files:
+            zf.write(file, arcname=file)
+            os.unlink(file)
         
 
     return ziptemp.name
@@ -158,14 +161,17 @@ if fileLoc:
         btn = st.button(label="Generate Data", type="primary")
         
         if btn:
-            with st.spinner("Processing..",show_time=True):
-                if len(cleanPattern.sub("", select_columns)) == 0:
-                    select_columns = None
-                zipFileName = splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, manual)
+            with st.spinner("", show_time=True):
+                with st.status("Processing...", expanded=True) as status:
+                    if len(cleanPattern.sub("", select_columns)) == 0:
+                        select_columns = None
+                    zipFileName = splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, manual)
 
-                outputFileName = f"{fileName}_frmt.zip"
+                    status.update(state="complete", expanded=False )
+                    outputFileName = f"{fileName}_frmt.zip"
+
                 with open(zipFileName, "rb") as f:
-                            st.download_button("Download Files", f,  file_name=outputFileName)
+                    st.download_button("Download Files", f,  file_name=outputFileName)
 
                 os.unlink(zipFileName) 
                 
