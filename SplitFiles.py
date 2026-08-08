@@ -106,7 +106,9 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
 
     return ziptemp.name
 
-st.header("Split Files")
+ 
+st.set_page_config(page_title="Split Files", page_icon="✂️", layout="centered")
+st.title("✂️ Split Files")
 
 fileLoc = st.file_uploader("Upload File", type=["csv", "xlsx"], on_change=update_colums)
 
