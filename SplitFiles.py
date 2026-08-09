@@ -106,19 +106,20 @@ def splitFiles(filePath,fileextn, select_columns, export_columns, CHUNK_SIZE, ma
 
                 partName = f"{clean_funnel}"
                 files = exportFile(part_df.iloc[1:, :], partName, CHUNK_SIZE)
-
-                #for file in files:
-                #    zf.write(file, arcname=file)
-                #    os.unlink(file)
+                
+                st.write("Packing in zip...")
+                for file in files:
+                    zf.write(file, arcname=file)
+                    os.unlink(file)
 
         else:
             Values = df.iloc[1:, :][export_columns].reset_index(drop=True)
             files = exportFile(Values, select_columns, CHUNK_SIZE)
 
-        st.write("Packing in zip...")
-        for file in files:
-            zf.write(file, arcname=file)
-            os.unlink(file)
+            st.write("Packing in zip...")
+            for file in files:
+                zf.write(file, arcname=file)
+                os.unlink(file)
         
 
     return ziptemp.name
