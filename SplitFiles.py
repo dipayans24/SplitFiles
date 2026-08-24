@@ -191,7 +191,7 @@ if fileLoc:
                     outputFileName = f"{fileName}_frmt.zip"
 
                 with open(zipFileName, "rb") as f:
-                    st.download_button("Download Files", f,  file_name=outputFileName)
+                    st.download_button("Download Files", f,  file_name=outputFileName, on_click = "ignore")
 
                 os.unlink(zipFileName) 
                 
