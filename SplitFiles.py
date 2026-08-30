@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd, re
 from datetime import date, datetime
 from math import ceil
+from openpyxl import load_workbook
 
 st.markdown("""
     <style>
@@ -66,6 +67,26 @@ def exportFile(part_df, partName, CHUNK_SIZE):
 
     return files 
 
+def get_columns(AttendeeFile,sheet_name ):
+    wb = load_workbook(AttendeeFile, read_only=True, data_only=True)
+    ws = wb[sheet_name]  # or wb.active / wb.worksheets[0]
+
+    header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=True))
+    columns = list(header_row)
+
+    wb.close()
+
+    return columns
+
+def get_sheets(AttendeeFile):
+    with zipfile.ZipFile(AttendeeFile) as z:
+        with z.open('xl/workbook.xml') as f:
+            xml = f.read().decode('utf-8')
+
+    ValidSheetName = re.findall(r'<sheet[^>]*name="([^"]*)"', xml)
+
+    return ValidSheetName
+    
 def reset_columns():
     if "df_col" in st.session_state:
         st.session_state.df_col = None
@@ -144,25 +165,27 @@ if fileLoc:
     cleanPattern = re.compile(r"\s")
     
     if fileextn == "xlsx":
-            if st.session_state.sheet_num is None:
-                with pd.ExcelFile(filePath, engine="openpyxl") as file:
-                    st.session_state.sheet_num = file.sheet_names
-                
-            if len(st.session_state.sheet_num) > 1:
-                select_sheets = st.selectbox(label = "Multiple Sheets detected. Select a sheet to process", options=st.session_state.sheet_num, on_change=reset_columns)
-                if select_sheets and st.session_state.df_col is None:
-                    df = pd.read_excel(filePath,nrows=10 , sheet_name=select_sheets)
-                    st.session_state.df_col = df.columns
-            else:
-                if st.session_state.df_col is None:
-                    df = pd.read_excel(filePath,nrows=10 , sheet_name=st.session_state.sheet_num[0])
-            
-                    st.session_state.df_col = df.columns
-    else:
-            if st.session_state.df_col is None:
-                df= pd.read_csv(filePath,sep=",", nrows = 10, encoding_errors="replace")
+        if st.session_state.sheet_num is None:
+            st.session_state.sheet_num = get_sheets(filePath)
 
-                st.session_state.df_col = df.columns
+            # with pd.ExcelFile(filePath, engine="openpyxl") as file:
+            #     st.session_state.sheet_num = file.sheet_names
+            
+        if len(st.session_state.sheet_num) > 1:
+            select_sheets = st.selectbox(label = "Multiple Sheets detected. Select a sheet to process", options=st.session_state.sheet_num, on_change=reset_columns)
+            if select_sheets and st.session_state.df_col is None:
+                #df = pd.read_excel(filePath,nrows=10 , sheet_name=select_sheets)
+                st.session_state.df_col = get_columns(filePath, select_sheets)
+        else:
+            if st.session_state.df_col is None:
+                #df = pd.read_excel(filePath,nrows=10 , sheet_name=st.session_state.sheet_num[0])
+        
+                st.session_state.df_col = get_columns(filePath, st.session_state.sheet_num[0])
+    else:
+        if st.session_state.df_col is None:
+            df= pd.read_csv(filePath,sep=",", nrows = 10, encoding_errors="replace")
+
+            st.session_state.df_col = df.columns
 
     chkbox = st.checkbox(label="Check to manually define 'mail to be sent' info")
 
